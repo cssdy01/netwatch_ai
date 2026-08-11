@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetWatch — Admin Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { background: #f8fafc; color: #0f172a; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .modal-bg { background: rgba(17, 24, 39, 0.65); backdrop-filter: blur(4px); }
+    pre { white-space: pre-wrap; word-break: break-all; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    .tab-active { color: #f97316; border-bottom: 2px solid #f97316; font-weight: 600; }
+    .tab-inactive { color: #6b7280; border-bottom: 2px solid transparent; font-weight: 500; transition: color 0.2s; }
+    .tab-inactive:hover { color: #374151; }
+    .stab-active { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; border-radius: 0.5rem; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .stab-inactive { background: #ffffff; color: #6b7280; border: 1px solid #e5e7eb; border-radius: 0.5rem; transition: all 0.2s; }
+    .stab-inactive:hover { background: #f9fafb; color: #374151; }
+    .inp, .si { background: #ffffff; border: 1px solid #d1d5db; border-radius: 0.5rem; color: #111827; padding: 0.5rem 0.75rem; font-size: 0.875rem; width: 100%; transition: all 0.2s; }
+    .inp:focus, .si:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15); }
+    .si { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+    .badge-ok { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-fault { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .badge-pause { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+    .pulse-orange { animation: pulseOrange 2s infinite; }
+    @keyframes pulseOrange {
+      0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); border-color: rgba(249, 115, 22, 0.6); }
+      70% { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); border-color: rgba(249, 115, 22, 0.2); }
+      100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); border-color: #fecaca; }
+    }
+    .toggle-switch { position: relative; display: inline-block; width: 36px; height: 20px; vertical-align: middle; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e2e8f0; transition: .3s; border-radius: 20px; }
+    .toggle-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    input:checked + .toggle-slider { background-color: #f97316; }
+    input:focus + .toggle-slider { box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2); }
+    input:checked + .toggle-slider:before { transform: translateX(16px); }
+    input:disabled + .toggle-slider { opacity: 0.5; cursor: not-allowed; }
+  </style>
+  <link rel="stylesheet" href="/ai-assistant.css">
+</head>
+<body class="min-h-screen flex flex-col">
+<header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+  <div class="flex items-center gap-4">
+    <img src="/images/TSAROLABS_updated_logo.png" alt="TSARO Labs" class="h-8 object-contain" onerror="this.style.display='none'">
+    <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+    <span class="font-bold text-lg text-gray-900 tracking-tight">NetWatch Admin</span>
+    <a href="/" class="text-sm font-medium text-gray-500 hover:text-orange-500 transition hidden sm:block">Monitor Dashboard &rarr;</a>
+  </div>
+  <div class="flex items-center gap-5">
+    <span id="istClockAdmin" class="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-md border border-gray-200"></span>
+    <span id="userLabel" class="text-sm font-medium text-gray-700 flex items-center gap-1.5"></span>
+    <button onclick="doLogout()" class="text-sm font-medium text-gray-500 hover:text-red-500 transition">Logout</button>
+  </div>
+</header>
+
+<!-- Main tabs -->
+<div class="px-6 flex gap-2 border-b border-gray-200 bg-white overflow-x-auto shadow-sm relative z-10">
+  <button class="px-5 py-3.5 text-sm tab-active whitespace-nowrap" onclick="setTab('tasks',this)">Monitored Tasks</button>
+  <button id="navUsers" class="px-5 py-3.5 text-sm tab-inactive whitespace-nowrap hidden" onclick="setTab('users',this)">User Management</button>
+  <button class="px-5 py-3.5 text-sm tab-inactive whitespace-nowrap" onclick="setTab('bin',this)">Recycle Bin</button>
+  <button class="px-5 py-3.5 text-sm tab-inactive whitespace-nowrap" onclick="setTab('backup',this)">Backup & Restore</button>
+  <button class="px-5 py-3.5 text-sm tab-inactive whitespace-nowrap" onclick="setTab('logs',this)">System Logs</button>
+  <button class="px-5 py-3.5 text-sm tab-inactive whitespace-nowrap" onclick="setTab('settings',this)">Settings & Health</button>
+</div>
+
+<main class="flex-1 p-6 max-w-[1600px] mx-auto w-full">
+
+<!-- ══ TASKS ══ -->
+<div id="tab-tasks">
+  <div class="flex flex-wrap items-center justify-between mb-5 gap-4">
+    <h2 class="font-bold text-xl text-gray-900 tracking-tight">Task Management</h2>
+  </div>
+  <div class="flex gap-2 mb-5">
+    <button id="stab-ping" class="stab-active px-4 py-2.5 text-sm transition-all flex items-center gap-2" onclick="setTaskSubTab('ping',this)">Systems</button>
+    <button id="stab-app" class="stab-inactive px-4 py-2.5 text-sm transition-all flex items-center gap-2" onclick="setTaskSubTab('app',this)">Applications</button>
+    <button onclick="openTaskModal(null)" class="ml-auto px-5 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20 transition-all active:scale-95 inline-flex items-center gap-2">Add Task</button>
+  </div>
+  <div id="tasks-ping">
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <input id="searchPingAdmin" type="search" placeholder="Search system tasks…" class="search-input w-64 si" oninput="renderTasks()">
+      <span id="pingTaskCount" class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm"></span>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3.5">Name</th><th class="px-5 py-3.5">Target</th><th class="px-5 py-3.5">OS</th><th class="px-5 py-3.5">Int</th><th class="px-5 py-3.5">N</th><th class="px-5 py-3.5">Health</th><th class="px-5 py-3.5">Status</th><th class="px-5 py-3.5">Email</th><th class="px-5 py-3.5">Last Check (IST)</th><th class="px-5 py-3.5 text-right">Actions</th></tr>
+        </thead>
+        <tbody id="pingTasksBody" class="divide-y divide-gray-100"><tr><td colspan="10" class="px-5 py-10 text-center text-gray-500">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="tasks-app" class="hidden">
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <input id="searchAppAdmin" type="search" placeholder="Search application tasks…" class="search-input w-64 si" oninput="renderTasks()">
+      <span id="appTaskCount" class="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200 shadow-sm"></span>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3.5">Name</th><th class="px-5 py-3.5">Server IP</th><th class="px-5 py-3.5">URL</th><th class="px-5 py-3.5">Host Map</th><th class="px-5 py-3.5">Int</th><th class="px-5 py-3.5">N</th><th class="px-5 py-3.5">Health</th><th class="px-5 py-3.5">Status</th><th class="px-5 py-3.5">Email</th><th class="px-5 py-3.5">Last Check (IST)</th><th class="px-5 py-3.5 text-right">Actions</th></tr>
+        </thead>
+        <tbody id="appTasksBody" class="divide-y divide-gray-100"><tr><td colspan="11" class="px-5 py-10 text-center text-gray-500">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ USERS (Superadmin Only) ══ -->
+<div id="tab-users" class="hidden">
+  <div class="flex flex-wrap items-center justify-between mb-5 gap-4">
+    <h2 class="font-bold text-xl text-gray-900 tracking-tight">User Management</h2>
+    <button onclick="openUserModal(null)" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all active:scale-95 inline-flex items-center gap-2">Add User</button>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+    <table class="w-full text-sm text-left">
+      <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+        <tr><th class="px-5 py-3.5">Email ID</th><th class="px-5 py-3.5">Role</th><th class="px-5 py-3.5">Created At (IST)</th><th class="px-5 py-3.5 text-right">Actions</th></tr>
+      </thead>
+      <tbody id="usersBody" class="divide-y divide-gray-100"><tr><td colspan="4" class="px-5 py-10 text-center text-gray-500">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ RECYCLE BIN ══ -->
+<div id="tab-bin" class="hidden">
+  <h2 class="font-bold text-xl text-gray-900 tracking-tight mb-5">Recycle Bin</h2>
+  <div class="flex gap-2 mb-5">
+    <button id="bstab-ping" class="stab-active px-4 py-2.5 text-sm transition-all" onclick="setBinSubTab('ping',this)">Systems</button>
+    <button id="bstab-app" class="stab-inactive px-4 py-2.5 text-sm transition-all" onclick="setBinSubTab('app',this)">Applications</button>
+  </div>
+  <div id="bin-ping">
+    <div class="flex items-center gap-3 mb-4"><input id="searchBinPing" type="search" placeholder="Search deleted system tasks…" class="search-input w-64 si" oninput="renderBin()"></div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3.5">Name</th><th class="px-5 py-3.5">Target</th><th class="px-5 py-3.5">Deleted At (IST)</th><th class="px-5 py-3.5 text-right">Actions</th></tr>
+        </thead>
+        <tbody id="binPingBody" class="divide-y divide-gray-100"><tr><td colspan="4" class="px-5 py-10 text-center text-gray-500">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div id="bin-app" class="hidden">
+    <div class="flex items-center gap-3 mb-4"><input id="searchBinApp" type="search" placeholder="Search deleted application tasks…" class="search-input w-64 si" oninput="renderBin()"></div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3.5">Name</th><th class="px-5 py-3.5">Server IP</th><th class="px-5 py-3.5">Deleted At (IST)</th><th class="px-5 py-3.5 text-right">Actions</th></tr>
+        </thead>
+        <tbody id="binAppBody" class="divide-y divide-gray-100"><tr><td colspan="4" class="px-5 py-10 text-center text-gray-500">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BACKUP ══ -->
+<div id="tab-backup" class="hidden">
+  <h2 class="font-bold text-xl text-gray-900 tracking-tight mb-5">Backup &amp; Restore</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="font-bold text-gray-900 mb-2">Export Data</h3>
+      <p class="text-sm text-gray-500 mb-5 leading-relaxed">Download a complete snapshot of all tasks and configurations as an Excel (.xlsx) file.</p>
+      <a href="#" onclick="doExport(event)" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-orange-500 transition-colors shadow-sm">Download Backup (.xlsx)</a>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+      <h3 class="font-bold text-gray-900 mb-2">Import Data</h3>
+      <p class="text-sm text-gray-500 mb-5 leading-relaxed">Upload a previously exported .xlsx backup to selectively restore records.</p>
+      <input type="file" id="importFile" accept=".xlsx" class="hidden" onchange="doImportPreview(this)">
+      <button onclick="document.getElementById('importFile').click()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-orange-500 transition-colors shadow-sm">Choose File…</button>
+    </div>
+  </div>
+
+  <div id="importPreviewPanel" class="hidden mt-6 bg-white rounded-xl border border-gray-200 p-6 shadow-md border-t-4 border-t-orange-500">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-bold text-gray-900 text-lg">Import Selection</h3>
+      <span id="importExpiry" class="text-xs font-medium text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200"></span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5 text-sm">
+      <div class="rounded-xl p-4 border border-gray-200 bg-gray-50">
+        <div class="font-bold text-gray-600 text-[11px] uppercase tracking-wider mb-2">Ping Tasks</div>
+        <div id="prevPing" class="text-gray-700 space-y-1 font-medium max-h-48 overflow-y-auto"></div>
+      </div>
+      <div class="rounded-xl p-4 border border-gray-200 bg-gray-50">
+        <div class="font-bold text-gray-600 text-[11px] uppercase tracking-wider mb-2">Application Tasks</div>
+        <div id="prevApp" class="text-gray-700 space-y-1 font-medium max-h-48 overflow-y-auto"></div>
+      </div>
+    </div>
+    <div id="importErrors" class="hidden mb-5 p-4 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700"></div>
+    <div class="flex flex-wrap gap-3 mb-4">
+      <button onclick="doImportApply('insert_and_update')" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all active:scale-95">✔ Import Selected Data</button>
+      <button onclick="doImportApply('cancel')" class="px-5 py-2.5 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all ml-auto">✖ Cancel</button>
+    </div>
+    <div id="importResult" class="text-sm font-medium"></div>
+  </div>
+</div>
+
+<!-- ══ LOGS ══ -->
+<div id="tab-logs" class="hidden">
+  <div class="flex flex-wrap items-center justify-between mb-5 gap-4">
+  <h2 class="font-bold text-xl text-gray-900 tracking-tight">System Logs</h2>
+  <div class="flex flex-wrap items-center gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm">
+    <select id="logPageLimit" class="inp bg-white border-0 py-1.5 shadow-sm text-xs font-medium" style="width:auto;" onchange="reloadCurrentLogTab()">
+      <option value="10">10 per page</option>
+      <option value="25" selected>25 per page</option>
+      <option value="50">50 per page</option>
+      <option value="100">100 per page</option>
+    </select>
+    <div class="w-px h-6 bg-gray-300 mx-1"></div>
+    <select id="dlRange" class="inp bg-white border-0 py-1.5 shadow-sm text-xs font-medium" style="width:auto;"><option value="today">Today</option><option value="7d">Last 7 Days</option><option value="15d">Last 15 Days</option></select>
+    <select id="dlCategory" class="inp bg-white border-0 py-1.5 shadow-sm text-xs font-medium" style="width:auto;"><option value="ALL">All Logs</option><option value="TASK_LOGS">Task Logs</option><option value="ADMIN_LOGS">Users Activity</option><option value="AUTH_LOGS">Auth Logs</option></select>
+    <button onclick="downloadLogs('json')" class="px-3 py-1.5 text-xs font-bold rounded-lg text-white bg-gray-700 hover:bg-gray-800 transition-colors">↓ JSON</button>
+    <button onclick="downloadLogs('csv')"  class="px-3 py-1.5 text-xs font-bold rounded-lg text-white bg-gray-700 hover:bg-gray-800 transition-colors">↓ CSV</button>
+  </div>
+</div>
+  <div class="flex gap-2 mb-5">
+    <button id="lstab-task"  class="stab-active px-4 py-2 text-sm transition-all" onclick="setLogTab('task',this)">Task Logs</button>
+    <button id="lstab-admin" class="stab-inactive px-4 py-2 text-sm transition-all" onclick="setLogTab('admin',this)">Users Activity</button>
+    <button id="lstab-audit" class="stab-inactive px-4 py-2 text-sm transition-all" onclick="setLogTab('audit',this)">Auth Logs</button>
+  </div>
+
+  <div id="logsSection-task">
+    <div class="flex flex-wrap items-center gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+      <select id="taskLogLevel" class="inp w-auto py-2 text-sm"><option value="">All Levels</option><option>INFO</option><option>WARN</option><option>ERROR</option></select>
+      <input id="taskLogSearch" placeholder="Filter by task name…" class="si w-64">
+      <button onclick="loadTaskLogs()" class="px-4 py-2 text-sm font-bold rounded-lg bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-colors">Apply Filter</button>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3 w-48">Time (IST)</th><th class="px-5 py-3 w-20">Level</th><th class="px-5 py-3 w-32">Category</th><th class="px-5 py-3 w-40">Task</th><th class="px-5 py-3">Message</th></tr>
+        </thead>
+        <tbody id="taskLogsBody" class="divide-y divide-gray-100"><tr><td colspan="5" class="px-5 py-10 text-center text-gray-500">Click Apply Filter to load</td></tr></tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex items-center justify-center gap-4 bg-white py-2 rounded-xl border border-gray-200 shadow-sm w-max mx-auto px-4">
+      <button id="btnTaskPrev" onclick="changeTaskLogPage(-1)" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">← Prev</button>
+      <span id="taskLogPageLabel" class="text-sm font-bold text-gray-600">Page 1</span>
+      <button id="btnTaskNext" onclick="changeTaskLogPage(1)"  class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">Next →</button>
+    </div>
+  </div>
+
+  <div id="logsSection-admin" class="hidden">
+    <div class="flex flex-wrap items-center gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+  <select id="adminLogLevel" class="inp w-auto py-2 text-sm"><option value="">All Levels</option><option>INFO</option><option>WARN</option><option>ERROR</option></select>
+  <input id="adminLogActor" placeholder="Search by Actor (Email)…" class="si w-48">
+  <button onclick="loadAdminLogs()" class="px-4 py-2 text-sm font-bold rounded-lg bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-colors">Apply Filter</button>
+</div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3 w-48">Time (IST)</th><th class="px-5 py-3 w-20">Level</th><th class="px-5 py-3 w-32">Actor (Email)</th><th class="px-5 py-3">Message</th></tr>
+        </thead>
+        <tbody id="adminLogsBody" class="divide-y divide-gray-100"><tr><td colspan="4" class="px-5 py-10 text-center text-gray-500">Click Apply Filter to load</td></tr></tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex items-center justify-center gap-4 bg-white py-2 rounded-xl border border-gray-200 shadow-sm w-max mx-auto px-4">
+      <button id="btnAdminPrev" onclick="changeAdminLogPage(-1)" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">← Prev</button>
+      <span id="adminLogPageLabel" class="text-sm font-bold text-gray-600">Page 1</span>
+      <button id="btnAdminNext" onclick="changeAdminLogPage(1)"  class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">Next →</button>
+    </div>
+  </div>
+
+  <div id="logsSection-audit" class="hidden">
+    
+    <div class="flex flex-wrap items-center gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
+  <input id="auditLogActor" placeholder="Search by Actor (Email)…" class="si w-48">
+  <input id="auditLogAction" placeholder="Search by Action…" class="si w-48">
+  <button onclick="loadAuditLogs()" class="px-4 py-2 text-sm font-bold rounded-lg bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-colors">Apply Filter</button>
+</div>
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      <table class="w-full text-sm text-left">
+        <thead class="text-[11px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 bg-gray-50">
+          <tr><th class="px-5 py-3 w-48">Time (IST)</th><th class="px-5 py-3 w-32">Actor (Email)</th><th class="px-5 py-3 w-48">Action</th><th class="px-5 py-3">Detail / IP</th></tr>
+        </thead>
+        <tbody id="auditLogsBody" class="divide-y divide-gray-100"><tr><td colspan="4" class="px-5 py-10 text-center text-gray-500">Click Refresh to load</td></tr></tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex items-center justify-center gap-4 bg-white py-2 rounded-xl border border-gray-200 shadow-sm w-max mx-auto px-4">
+      <button id="btnAuditPrev" onclick="changeAuditLogPage(-1)" class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">← Prev</button>
+      <span id="auditLogPageLabel" class="text-sm font-bold text-gray-600">Page 1</span>
+      <button id="btnAuditNext" onclick="changeAuditLogPage(1)"  class="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">Next →</button>
+    </div>
+  </div>
+
+  <div class="mt-8 bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+  <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+    <h3 class="font-bold text-gray-800">Log Archives (end-of-day files)</h3>
+    <div>
+      <button onclick="loadArchives()" class="text-xs font-bold text-orange-500 hover:text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-100">Refresh List</button>
+      <button onclick="triggerArchive()" class="text-xs font-bold text-white bg-gray-800 px-3 py-1.5 rounded hover:bg-gray-900 transition-colors shadow-sm ml-2">Force Archive Now</button>
+    </div>
+  </div>
+  <div id="archivesList" class="text-sm text-gray-500 font-medium">Click Refresh to load archives.</div>
+</div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div id="tab-settings" class="hidden">
+  <h2 class="font-bold text-xl text-gray-900 tracking-tight mb-5">Settings &amp; Health</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <h3 class="font-bold text-gray-900 mb-2">Mail Delivery Test</h3>
+      <p class="text-sm text-gray-500 mb-4">Sends via system mail → Postfix → relay.</p>
+      <div class="flex gap-3">
+        <input id="testEmailAddr" type="email" placeholder="admin@company.com" class="inp flex-1">
+        <button onclick="sendTestMail()" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-gray-800 hover:bg-gray-900 text-white shadow-sm">Send Test</button>
+      </div>
+      <div id="testMailResult" class="mt-3 text-sm font-medium"></div>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+        <h3 class="font-bold text-gray-900">System Health</h3>
+        <button onclick="loadHealth()" class="text-xs font-bold text-orange-500 hover:text-orange-600 bg-orange-50 px-2 py-1 rounded border border-orange-100">Refresh</button>
+      </div>
+      <div id="healthInfo" class="text-sm text-gray-600 space-y-1.5 font-medium">Loading…</div>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- ══ TASK MODAL ══ -->
+<div id="taskModal" class="fixed inset-0 z-50 hidden modal-bg flex items-center justify-center p-4">
+  <div class="w-full max-w-2xl bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col max-h-[92vh]">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+      <h3 id="tmTitle" class="font-bold text-lg text-gray-900 tracking-tight">Add Task</h3>
+      <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-6">
+      <div id="formErr" class="hidden mb-5 p-3 rounded-xl text-sm bg-red-50 text-red-700 border border-red-200 font-medium"></div>
+      <div class="space-y-5">
+        <input type="hidden" id="taskId">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Task Name *</label>
+            <input id="fName" required class="inp">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Type *</label>
+            <select id="fType" onchange="onTypeChange()" class="inp font-medium">
+              <option value="PING">Ping (ICMP)</option>
+              <option value="APPLICATION">Application (HTTP)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5" id="targetLabel">Target IP / Hostname *</label>
+          <input id="fTarget" required class="inp font-mono text-sm" placeholder="e.g. 192.168.1.1">
+        </div>
+
+        <div id="pingFields">
+          <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">OS Type</label>
+          <select id="fOsType" class="inp font-medium" style="max-width:200px;"><option>Linux</option><option>Windows</option><option>Other</option></select>
+        </div>
+
+        <div id="urlFields" class="hidden">
+          <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Monitored URL *</label>
+          <input id="fUrl" class="inp font-mono text-sm mb-3" placeholder="http://hostname:port/path">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Expected HTTP status (opt)</label>
+              <input id="fExpectedStatus" placeholder="200" type="number" min="100" max="599" class="inp">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Timeout sec (opt)</label>
+              <input id="fTimeout" placeholder="15" type="number" min="1" max="120" class="inp">
+            </div>
+          </div>
+        </div>
+
+        <div id="hostMappingSection" class="hidden">
+          <div class="rounded-xl border border-gray-200 bg-gray-50 p-5 shadow-sm">
+            <label class="flex items-start gap-3 cursor-pointer select-none">
+              <input id="fHmEnabled" type="checkbox" class="w-4 h-4 mt-0.5 accent-orange-500" onchange="onHmToggle()">
+              <div>
+                <span class="text-sm font-bold text-gray-900">Enable Hostname Mapping</span>
+                <p class="text-xs text-gray-500 mt-1">Use this when your URL contains a private hostname that must resolve to a specific IP.</p>
+              </div>
+            </label>
+            <div id="hmFields" class="hidden mt-4 pt-4 border-t border-gray-200 space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Hostname *</label>
+                  <input id="fHmHostname" placeholder="dev.domain.com" class="inp font-mono text-sm">
+                </div>
+                <div>
+                  <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">IP Address *</label>
+                  <input id="fHmIp" placeholder="192.168.x.x" class="inp font-mono text-sm">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Check Interval (min, 3–15) *</label>
+            <input id="fInterval" type="number" min="3" max="15" value="5" required class="inp font-medium">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">N Threshold (1–5)</label>
+            <input id="fN" type="number" min="1" max="5" value="2" class="inp font-medium">
+          </div>
+        </div>
+
+        <div class="border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm bg-white">
+          <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+            <span class="text-sm font-bold text-gray-900">Email Alerts (Max 5 per tier)</span>
+            <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input id="fEmailEnabled" type="checkbox" class="w-4 h-4 accent-orange-500" checked onchange="onEmailToggle()">
+              <span class="font-medium text-gray-600">Enabled</span>
+            </label>
+          </div>
+          <div id="emailFields" class="space-y-3 transition-opacity">
+            <div class="grid grid-cols-2 gap-4 mb-2">
+               <div>
+                  <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">L2 Delay (Minutes)</label>
+                  <input id="fL2Delay" type="number" min="1" value="2880" class="inp" title="Default 48h = 2880m">
+               </div>
+               <div>
+                  <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">L3 Repeat (Minutes)</label>
+                  <input id="fL3Repeat" type="number" min="1" value="2880" class="inp" title="Default 48h = 2880m">
+               </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">L1 — Immediate alert</label>
+              <input id="fL1" placeholder="email1@co.com, email2@co.com" class="inp">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">L2 — Delayed</label>
+              <input id="fL2" placeholder="manager@co.com" class="inp">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">L3 — Repeated</label>
+              <input id="fL3" placeholder="director@co.com" class="inp">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-3">
+          <button type="button" onclick="testBeforeSave()" class="px-5 py-3 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-orange-500 transition-colors shadow-sm">Test Connection</button>
+          <button type="button" onclick="saveTask()" class="flex-1 px-5 py-3 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all active:scale-[0.98]">Save Task</button>
+        </div>
+        <div id="testResult" class="text-sm font-medium"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ USER MODAL ══ -->
+<div id="userModal" class="fixed inset-0 z-50 hidden modal-bg flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+      <h3 id="umTitle" class="font-bold text-lg text-gray-900 tracking-tight">Add User</h3>
+      <button onclick="closeUserModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div id="uFormErr" class="hidden p-3 rounded-xl text-sm bg-red-50 text-red-700 border border-red-200 font-medium"></div>
+      <input type="hidden" id="uId">
+      <div>
+        <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email ID *</label>
+        <input id="uEmail" type="email" required class="inp text-sm">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Password *</label>
+        <input id="uPassword" type="password" class="inp text-sm" placeholder="Leave blank to keep existing password">
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Role *</label>
+        <select id="uRole" class="inp text-sm font-medium">
+          <option value="user">User</option>
+          <option value="superadmin">Superadmin</option>
+        </select>
+      </div>
+      <button type="button" onclick="saveUser()" class="w-full mt-4 py-3 rounded-xl text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white shadow-md transition-all active:scale-[0.98]">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TASK DETAIL MODAL ══ -->
+<div id="detailModal" class="fixed inset-0 z-50 hidden modal-bg flex items-center justify-center p-4">
+  <div class="w-full max-w-2xl bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col max-h-[92vh]">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+      <h3 id="dtTitle" class="font-bold text-lg text-gray-900 tracking-tight">Task Detail</h3>
+      <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+    </div>
+    <div id="dtBody" class="overflow-y-auto flex-1 p-6 space-y-5 text-sm"></div>
+  </div>
+</div>
+
+<script src="/config.js"></script>
+<script src="/js/api.js"></script>
+<script>
+function toIST(utcVal) {
+  if (!utcVal) return '—';
+  return new Date(utcVal).toLocaleString('en-IN', { timeZone:'Asia/Kolkata', hour12:false }).replace(/\//g,'-') + ' IST';
+}
+setInterval(() => { const c = document.getElementById('istClockAdmin'); if (c) c.textContent = toIST(new Date().toISOString()); }, 1000);
+
+let currentUser = null;
+API.me().then(u => { 
+  currentUser = u;
+  document.getElementById('userLabel').textContent = u.username;
+  if(u.role === 'superadmin') {
+     document.getElementById('navUsers').classList.remove('hidden');
+  }
+}).catch(() => { window.location = '/admin/login.html'; });
+async function doLogout() { await API.logout().catch(()=>{}); window.location='/admin/login.html'; }
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return String(s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ── TABS ──
+const TABS=['tasks','users','bin','backup','logs','settings'];
+function setTab(name,btn){
+  TABS.forEach(t=>document.getElementById('tab-'+t)?.classList.toggle('hidden',t!==name));
+  document.querySelectorAll('[onclick^="setTab"]').forEach(b=>{ b.className=b.className.replace('tab-active','tab-inactive'); });
+  if(btn) btn.className=btn.className.replace('tab-inactive','tab-active');
+  if(name==='users')    loadUsers();
+  if(name==='bin')      loadBin();
+  if(name==='logs')     { loadTaskLogs(); loadArchives(); }
+  if(name==='settings') loadHealth();
+}
+function setTaskSubTab(name,btn){
+  document.getElementById('tasks-ping').classList.toggle('hidden',name!=='ping');
+  document.getElementById('tasks-app').classList.toggle('hidden', name!=='app');
+  document.querySelectorAll('[id^="stab-"]').forEach(b=>b.className=b.className.replace('stab-active','stab-inactive'));
+  btn.className=btn.className.replace('stab-inactive','stab-active');
+}
+function setBinSubTab(name,btn){
+  document.getElementById('bin-ping').classList.toggle('hidden',name!=='ping');
+  document.getElementById('bin-app').classList.toggle('hidden', name!=='app');
+  document.querySelectorAll('[id^="bstab-"]').forEach(b=>b.className=b.className.replace('stab-active','stab-inactive'));
+  btn.className=btn.className.replace('stab-inactive','stab-active');
+}
+function setLogTab(name,btn){
+  ['task','admin','audit'].forEach(s=>document.getElementById('logsSection-'+s).classList.toggle('hidden',s!==name));
+  document.querySelectorAll('[id^="lstab-"]').forEach(b=>b.className=b.className.replace('stab-active','stab-inactive'));
+  btn.className=btn.className.replace('stab-inactive','stab-active');
+  if(name==='task')  loadTaskLogs();
+  if(name==='admin') loadAdminLogs();
+  if(name==='audit') loadAuditLogs();
+}
+
+// ── USERS ──
+let usersData = [];
+async function loadUsers() {
+  try {
+    usersData = await API.users();
+    document.getElementById('usersBody').innerHTML = usersData.map(u => `
+      <tr class="hover:bg-gray-50 border-b border-gray-100">
+        <td class="px-5 py-3 font-bold">${escHtml(u.email)}</td>
+        <td class="px-5 py-3 text-sm">${u.role === 'superadmin' ? '<span class="px-2 py-1 rounded bg-orange-100 text-orange-700 text-xs font-bold uppercase">Superadmin</span>' : '<span class="px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-bold uppercase">User</span>'}</td>
+        <td class="px-5 py-3 text-xs text-gray-500">${toIST(u.created_at)}</td>
+        <td class="px-5 py-3 text-right">
+          <button onclick="openUserModal('${u.id}')" class="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-100">Edit</button>
+          <button onclick="deleteUser('${u.id}', '${u.email}')" class="px-2 py-1 text-xs rounded border border-red-200 text-red-600 bg-red-50 hover:bg-red-100">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+function openUserModal(id) {
+  document.getElementById('userModal').classList.remove('hidden');
+  document.getElementById('uFormErr').classList.add('hidden');
+  const u = id ? usersData.find(x => x.id === id) : null;
+  document.getElementById('umTitle').textContent = u ? 'Edit User' : 'Add User';
+  document.getElementById('uId').value = u ? u.id : '';
+  document.getElementById('uEmail').value = u ? u.email : '';
+  document.getElementById('uEmail').disabled = !!u; // Don't allow changing email once created to avoid conflicts
+  document.getElementById('uPassword').value = '';
+  document.getElementById('uRole').value = u ? u.role : 'user';
+}
+
+function closeUserModal() { document.getElementById('userModal').classList.add('hidden'); }
+
+async function saveUser() {
+  const id = document.getElementById('uId').value;
+  const email = document.getElementById('uEmail').value.trim();
+  const password = document.getElementById('uPassword').value;
+  const role = document.getElementById('uRole').value;
+  const err = document.getElementById('uFormErr');
+  err.classList.add('hidden');
+
+  if(!email) { err.textContent = 'Email required'; err.classList.remove('hidden'); return; }
+  if(!id && !password) { err.textContent = 'Password required for new user'; err.classList.remove('hidden'); return; }
+
+  try {
+    if(id) await API.updateUser(id, { password, role });
+    else await API.createUser({ email, password, role });
+    closeUserModal(); loadUsers();
+  } catch(e) { err.textContent = e.message; err.classList.remove('hidden'); }
+}
+
+async function deleteUser(id, email) {
+  if(!confirm(`Permanently delete user ${email}?`)) return;
+  try {
+    await API.deleteUser(id); loadUsers();
+  } catch(e) { alert(e.message); }
+}
+
+// ── TASKS ──
+let allTasks=[];
+async function loadTasks(){ try{ allTasks=await API.tasks(); renderTasks(); }catch(e){ if(e.status===401) window.location='/admin/login.html'; } }
+
+function renderTasks(){
+  const ps=(document.getElementById('searchPingAdmin')?.value||'').toLowerCase();
+  const as=(document.getElementById('searchAppAdmin')?.value||'').toLowerCase();
+  const ping=allTasks.filter(t=>t.type==='PING' && (!ps||t.name.toLowerCase().includes(ps)||t.target.toLowerCase().includes(ps)));
+  const app =allTasks.filter(t=>t.type==='APPLICATION' && (!as||t.name.toLowerCase().includes(as)||t.target.toLowerCase().includes(as)));
+  if(document.getElementById('pingTaskCount')) document.getElementById('pingTaskCount').textContent=ping.length+' task'+(ping.length!==1?'s':'');
+  if(document.getElementById('appTaskCount')) document.getElementById('appTaskCount').textContent=app.length+' task'+(app.length!==1?'s':'');
+
+  document.getElementById('pingTasksBody').innerHTML=ping.length?ping.map(t=>taskRow(t,'ping')).join('') : `<tr><td colspan="10" class="text-center py-10 text-gray-500">No system tasks found</td></tr>`;
+  document.getElementById('appTasksBody').innerHTML=app.length?app.map(t=>taskRow(t,'app')).join('') : `<tr><td colspan="11" class="text-center py-10 text-gray-500">No application tasks found</td></tr>`;
+}
+
+function taskRow(t,mode){
+  const inactive=!t.is_active;
+  const dim=inactive?'opacity-70 bg-gray-50':'';
+  const sb=inactive?'<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase badge-pause">PHASED</span>':t.status==='OK'?'<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase badge-ok">online</span>':'<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase badge-fault pulse-orange">FAULT</span>';
+  const hmBadge=mode==='app'&&t.host_mapping_enabled?`<span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-blue-50 text-blue-700 border border-blue-200" title="${escAttr(t.host_mapping_hostname)}→${escAttr(t.host_mapping_ip)}">MAPPED</span>`:(mode==='app'?'<span class="text-gray-400 font-medium text-xs">—</span>':'');
+  
+  const pingCols=`<td class="px-5 py-3 font-mono text-xs text-orange-600 font-semibold">${escHtml(t.target)}</td><td class="px-5 py-3 text-gray-500 text-xs font-medium">${escHtml(t.os_type||'Linux')}</td>`;
+  const appCols=`<td class="px-5 py-3 font-mono text-xs text-orange-600 font-semibold">${escHtml(t.target)}</td><td class="px-5 py-3 text-xs truncate max-w-[150px]" title="${escAttr(t.url)}">${escHtml(t.url)}</td><td class="px-5 py-3">${hmBadge}</td>`;
+
+  return `<tr class="hover:bg-gray-50 cursor-pointer transition-colors ${dim}" onclick="openDetail('${t.id}')">
+    <td class="px-5 py-3 font-bold text-gray-800">${escHtml(t.name)}</td>
+    ${mode==='ping'?pingCols:appCols}
+    <td class="px-5 py-3 text-gray-500 text-xs font-medium">${t.interval_min}m</td>
+    <td class="px-5 py-3 text-gray-500 text-xs font-medium">${t.n_threshold}</td>
+    <td class="px-5 py-3">${sb}</td>
+    <td class="px-5 py-3" onclick="event.stopPropagation()"><label class="toggle-switch"><input type="checkbox" ${t.is_active?'checked':''} onchange="toggleActive('${t.id}',this)"><span class="toggle-slider"></span></label></td>
+    <td class="px-5 py-3" onclick="event.stopPropagation()"><label class="toggle-switch"><input type="checkbox" ${t.email_enabled?'checked':''} onchange="toggleEmail('${t.id}',this)"><span class="toggle-slider"></span></label></td>
+    <td class="px-5 py-3 text-xs text-gray-500 font-medium">${t.last_checked?toIST(t.last_checked):'—'}</td>
+    <td class="px-5 py-3 text-right" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-end gap-1.5">
+        <button onclick="runTask('${t.id}', this)" ${inactive?'disabled':''} class="px-3 py-1.5 text-xs font-bold rounded-md shadow-sm border transition-all ${inactive?'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed':'bg-orange-500 text-white border-orange-600 hover:bg-orange-600'}">Run</button>
+        <button onclick="openTaskModal('${t.id}')" class="px-2.5 py-1.5 text-xs rounded-md shadow-sm border bg-white text-gray-700 border-gray-300 hover:bg-gray-50">✎</button>
+        <button onclick="deleteTask('${t.id}','${escAttr(t.name)}')" class="px-2.5 py-1.5 text-xs rounded-md shadow-sm border bg-red-50 text-red-600 border-red-200 hover:bg-red-100">🗑</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+async function toggleActive(id, cb){ cb.disabled=true; try{ await API.toggleActive(id); loadTasks(); }catch(e){ cb.checked=!cb.checked; cb.disabled=false; } }
+async function toggleEmail(id, cb){ cb.disabled=true; try{ await API.toggleEmail(id); loadTasks(); }catch(e){ cb.checked=!cb.checked; cb.disabled=false; } }
+async function runTask(id, btn){
+  const orig=btn.innerHTML; btn.innerHTML='...'; btn.disabled=true;
+  try{ await API.runTask(id); await loadTasks(); if(!document.getElementById('detailModal').classList.contains('hidden')) openDetail(id); }
+  catch(e){ btn.innerHTML=orig; btn.disabled=false; }
+}
+async function deleteTask(id,name){ if(!confirm(`Move "${name}" to Bin?`)) return; await API.deleteTask(id); loadTasks(); }
+
+let binTasks=[];
+async function loadBin(){ binTasks=await API.tasksBin().catch(()=>[]); renderBin(); }
+function renderBin(){
+  const ps=(document.getElementById('searchBinPing')?.value||'').toLowerCase();
+  const as=(document.getElementById('searchBinApp')?.value||'').toLowerCase();
+  const bp=binTasks.filter(t=>t.type==='PING'&&(!ps||t.name.toLowerCase().includes(ps)||t.target.toLowerCase().includes(ps)));
+  const ba=binTasks.filter(t=>t.type==='APPLICATION'&&(!as||t.name.toLowerCase().includes(as)||t.target.toLowerCase().includes(as)));
+
+  const mkRows=(list,cols)=>list.length?list.map(t=>`<tr class="hover:bg-gray-50"><td class="px-5 py-3 font-bold">${escHtml(t.name)}</td><td class="px-5 py-3 font-mono text-xs text-gray-500">${escHtml(t.target)}</td><td class="px-5 py-3 text-xs text-gray-500">${toIST(t.deleted_at)}</td><td class="px-5 py-3 text-right"><button onclick="restoreTask('${t.id}')" class="px-3 py-1.5 text-xs font-bold rounded-md bg-white border border-gray-300 text-green-700 hover:bg-green-50 shadow-sm mr-2">Restore</button><button onclick="hardDelete('${t.id}','${escAttr(t.name)}')" class="px-3 py-1.5 text-xs font-bold rounded-md bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 shadow-sm">Delete Forever</button></td></tr>`).join('') : `<tr><td colspan="${cols}" class="text-center py-10 text-gray-500">Bin is empty.</td></tr>`;
+  document.getElementById('binPingBody').innerHTML=mkRows(bp,4);
+  document.getElementById('binAppBody').innerHTML =mkRows(ba,4);
+}
+async function restoreTask(id){ await API.restoreTask(id); loadBin(); loadTasks(); }
+async function hardDelete(id,name){ if(!confirm(`Permanently delete "${name}"?`)) return; await API.hardDelete(id); loadBin(); }
+
+function openTaskModal(id){
+  document.getElementById('taskModal').classList.remove('hidden');
+  document.getElementById('formErr').classList.add('hidden');
+  document.getElementById('testResult').innerHTML='';
+  document.getElementById('taskId').value=id||'';
+
+  if(id){
+    const t=allTasks.find(x=>x.id===id);
+    if(t){
+      document.getElementById('tmTitle').textContent='Edit Task';
+      document.getElementById('fName').value=t.name; document.getElementById('fType').value=t.type; document.getElementById('fTarget').value=t.target;
+      document.getElementById('fOsType').value=t.os_type||'Linux'; document.getElementById('fInterval').value=t.interval_min; document.getElementById('fN').value=t.n_threshold;
+      document.getElementById('fL2Delay').value=t.l2_delay_min || 2880; document.getElementById('fL3Repeat').value=t.l3_repeat_min || 2880;
+      document.getElementById('fL1').value=t.email_l1||''; document.getElementById('fL2').value=t.email_l2||''; document.getElementById('fL3').value=t.email_l3||'';
+      document.getElementById('fEmailEnabled').checked=t.email_enabled!==false&&t.email_enabled!==0;
+      document.getElementById('fHmEnabled').checked=!!t.host_mapping_enabled; document.getElementById('fHmHostname').value=t.host_mapping_hostname||''; document.getElementById('fHmIp').value=t.host_mapping_ip||'';
+      document.getElementById('fUrl').value = t.url || '';
+      document.getElementById('fExpectedStatus').value = t.expected_status || '';
+      document.getElementById('fTimeout').value = t.timeout_sec || 15;
+    }
+  } else {
+    document.getElementById('tmTitle').textContent='Add Task';
+    document.getElementById('fName').value=''; document.getElementById('fType').value='PING'; document.getElementById('fTarget').value='';
+    document.getElementById('fOsType').value='Linux'; document.getElementById('fInterval').value=5; document.getElementById('fN').value=2;
+    document.getElementById('fL2Delay').value=2880; document.getElementById('fL3Repeat').value=2880;
+    document.getElementById('fL1').value=''; document.getElementById('fL2').value=''; document.getElementById('fL3').value='';
+    document.getElementById('fEmailEnabled').checked=true; document.getElementById('fHmEnabled').checked=false;
+    document.getElementById('fHmHostname').value=''; document.getElementById('fHmIp').value='';
+    document.getElementById('fUrl').value=''; document.getElementById('fExpectedStatus').value=''; document.getElementById('fTimeout').value=15;
+  }
+  onTypeChange(); onEmailToggle(); onHmToggle();
+}
+function closeTaskModal(){ document.getElementById('taskModal').classList.add('hidden'); }
+function onTypeChange(){
+  const type=document.getElementById('fType').value;
+  document.getElementById('pingFields').classList.toggle('hidden',type!=='PING');
+  document.getElementById('urlFields').classList.toggle('hidden',type!=='APPLICATION');
+  document.getElementById('hostMappingSection').classList.toggle('hidden',type!=='APPLICATION');
+  document.getElementById('targetLabel').textContent=type==='PING'?'Target IP / Hostname *':'Server IP / Hostname *';
+}
+function onEmailToggle(){ document.getElementById('emailFields').style.opacity=document.getElementById('fEmailEnabled').checked?'1':'0.4'; }
+function onHmToggle(){ document.getElementById('hmFields').classList.toggle('hidden',!document.getElementById('fHmEnabled').checked); }
+
+function validateTaskForm(payload,type){
+  if(!payload.name) return 'Task name required';
+  if(!payload.target) return 'Target required';
+  if(payload.interval_min<3||payload.interval_min>15) return 'Interval must be 3-15m';
+  if(payload.n_threshold<1||payload.n_threshold>5) return 'N Threshold must be 1-5';
+  if(type==='APPLICATION'){
+    if(!payload.url || !payload.url.startsWith('http')) return 'URL must start with http or https';
+    if(payload.host_mapping_enabled){
+      if(!payload.host_mapping_hostname) return 'Host mapping hostname required';
+      if(!payload.host_mapping_ip) return 'Host mapping IP required';
+    }
+  }
+  for(let f of ['email_l1','email_l2','email_l3']){
+    let arr = payload[f].split(',').filter(x=>x.trim());
+    if(arr.length > 5) return 'Max 5 emails per level';
+  }
+  return null;
+}
+
+async function testBeforeSave(){
+  const res=document.getElementById('testResult'); res.innerHTML='Testing...';
+  try{
+    const data=await API.testTask({
+      type: document.getElementById('fType').value, target: document.getElementById('fTarget').value.trim(),
+      url: document.getElementById('fUrl').value.trim(), expected_status: document.getElementById('fExpectedStatus').value, timeout_sec: document.getElementById('fTimeout').value,
+      host_mapping_enabled: document.getElementById('fHmEnabled').checked, host_mapping_hostname: document.getElementById('fHmHostname').value.trim(), host_mapping_ip: document.getElementById('fHmIp').value.trim(),
+    });
+    const ok=data.result==='PASS';
+    res.innerHTML=`<span class="px-2 py-1 rounded font-bold text-xs ${ok?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${data.result}</span>`+(data.responseMs?`<span class="ml-2 text-xs">${data.responseMs}ms</span>`:'')+(data.errorRaw?`<br><span class="text-xs text-red-600">${escHtml(data.errorRaw)}</span>`:'');
+  }catch(e){ res.innerHTML=`<span class="text-red-600 font-bold text-xs">Error: ${escHtml(e.message)}</span>`; }
+}
+
+async function saveTask(){
+  const err=document.getElementById('formErr'); err.classList.add('hidden');
+  const type=document.getElementById('fType').value;
+  const payload={
+    name: document.getElementById('fName').value.trim(), type, target: document.getElementById('fTarget').value.trim(),
+    os_type: document.getElementById('fOsType').value, interval_min: parseInt(document.getElementById('fInterval').value), n_threshold: parseInt(document.getElementById('fN').value),
+    l2_delay_min: document.getElementById('fL2Delay').value, l3_repeat_min: document.getElementById('fL3Repeat').value,
+    email_l1: document.getElementById('fL1').value.trim(), email_l2: document.getElementById('fL2').value.trim(), email_l3: document.getElementById('fL3').value.trim(),
+    email_enabled: document.getElementById('fEmailEnabled').checked, url: type==='APPLICATION'?document.getElementById('fUrl').value.trim():'',
+    expected_status: document.getElementById('fExpectedStatus').value, timeout_sec: document.getElementById('fTimeout').value,
+    host_mapping_enabled: document.getElementById('fHmEnabled').checked, host_mapping_hostname: document.getElementById('fHmHostname').value.trim(), host_mapping_ip: document.getElementById('fHmIp').value.trim(),
+  };
+  const clientErr=validateTaskForm(payload,type);
+  if(clientErr){ err.textContent=clientErr; err.classList.remove('hidden'); return; }
+  try{
+    const id=document.getElementById('taskId').value;
+    if(id) await API.updateTask(id,payload); else await API.createTask(payload);
+    closeTaskModal(); loadTasks();
+  }catch(e){ err.textContent=e.message||'Save failed'; err.classList.remove('hidden'); }
+}
+
+async function openDetail(id){
+  document.getElementById('detailModal').classList.remove('hidden'); 
+  document.getElementById('dtBody').innerHTML='<div class="text-gray-500 flex items-center gap-2"><svg class="w-5 h-5 animate-spin text-orange-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Loading...</div>';
+  
+  try{
+    const t=await API.task(id); 
+    document.getElementById('dtTitle').textContent=t.name;
+    
+    const epHtml=t.type==='APPLICATION'&&t.last_endpoint_results?`<div class="bg-white border p-3 mt-3 rounded shadow-sm text-xs">Endpoint: <span class="font-mono">${escHtml(t.last_endpoint_results[0]?.url)}</span> | Status: ${t.last_endpoint_results[0]?.httpStatus||'Err'}</div>`:'';
+    
+    // Generate Recent Checks HTML (Last 10)
+    const checksHtml = t.checks?.length
+      ? `<div class="mt-4">
+           <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Recent Checks (Last 10)</div>
+           <div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+             ${t.checks.slice(0, 10).map(c => `
+               <div class="flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 last:border-0 text-sm hover:bg-gray-50 transition-colors">
+                 <span class="font-bold w-12 text-center rounded px-1 py-0.5 text-xs ${c.result === 'PASS' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${c.result}</span>
+                 <span class="text-gray-600 font-medium">${toIST(c.checked_at)}</span>
+                 ${c.response_ms != null ? `<span class="text-gray-500 text-xs ml-auto bg-gray-100 px-2 py-1 rounded-md border border-gray-200">${c.response_ms}ms</span>` : ''}
+               </div>`).join('')}
+           </div>
+         </div>` 
+      : '<div class="mt-4 text-sm text-gray-500 px-4 py-4 text-center border border-gray-200 rounded-xl bg-white shadow-sm">No checks yet</div>';
+
+    document.getElementById('dtBody').innerHTML=`
+      <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm text-gray-500 bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
+        <div>Type: <b class="text-gray-900">${t.type}</b></div><div>Target: <b class="text-orange-600 font-mono">${escHtml(t.target)}</b></div>
+        <div>Interval: <b class="text-gray-900">${t.interval_min}m</b></div><div>N Threshold: <b class="text-gray-900">${t.n_threshold}</b></div>
+      </div>
+      ${t.type === 'APPLICATION' && t.url ? `<div class="bg-white border border-gray-200 shadow-sm rounded-xl p-3 text-xs font-mono break-all mt-3">${escHtml(t.url)}</div>` : ''}
+      ${epHtml}
+      ${t.last_error_raw?`<pre class="text-xs text-red-800 rounded-xl p-4 bg-red-50 border border-red-200 mt-3 whitespace-pre-wrap shadow-sm">${escHtml(t.last_error_raw)}</pre>`:''}
+      
+      ${checksHtml}
+      
+      <div class="mt-5 flex gap-3">
+        <button onclick="runTask('${t.id}', this)" class="px-4 py-2.5 text-sm font-bold rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-orange-500 transition-colors shadow-sm flex items-center justify-center gap-1.5">▶ Run Now</button>
+        <button onclick="closeDetailModal();openTaskModal('${t.id}')" class="flex-1 px-4 py-2.5 bg-gray-800 text-white rounded-xl font-bold text-sm shadow-sm hover:bg-gray-900 transition-colors text-center">✎ Edit Task</button>
+      </div>`;
+  }catch(e){ 
+    document.getElementById('dtBody').innerHTML=`<div class="text-red-600 bg-red-50 p-4 rounded-xl border border-red-200 text-sm font-medium">Failed to load details: ${escHtml(e.message)}</div>`; 
+  }
+}
+
+function closeDetailModal(){ document.getElementById('detailModal').classList.add('hidden'); }
+
+// ── BACKUP ──
+function doExport(e){ e.preventDefault(); window.open(API.exportUrl(),'_blank'); }
+let importSessionId=null;
+async function doImportPreview(input){
+  const file=input.files[0]; if(!file) return; input.value='';
+  document.getElementById('importPreviewPanel').classList.remove('hidden');
+  document.getElementById('importResult').innerHTML='Parsing file...';
+  try{
+    const data=await API.importPreview(file);
+    importSessionId=data.session_id;
+
+    // Build lists with checkboxes to select items
+    const buildList = (type, action, arr) => {
+      if (!arr || !arr.length) return '';
+      return arr.map(r => `
+        <label class="flex items-center gap-2 py-1 border-b border-gray-200 last:border-0 hover:bg-gray-100 px-1 rounded cursor-pointer text-xs">
+          <input type="checkbox" class="import-cb accent-orange-500 w-3 h-3" data-type="${type}" value="${r.id || r.name}" checked>
+          <span class="${action === 'insert' ? 'text-green-600' : 'text-orange-600'} font-bold w-12">${action}</span>
+          <span class="truncate text-gray-800">${escHtml(r.name)}</span>
+        </label>
+      `).join('');
+    };
+
+    const pingListHtml = buildList('ping', 'insert', data.ping.to_insert_list) + buildList('ping', 'update', data.ping.to_update_list);
+    const appListHtml = buildList('app', 'insert', data.application.to_insert_list) + buildList('app', 'update', data.application.to_update_list);
+
+    document.getElementById('prevPing').innerHTML = pingListHtml || '<div class="text-xs text-gray-400 p-2">No valid ping tasks to import.</div>';
+    document.getElementById('prevApp').innerHTML = appListHtml || '<div class="text-xs text-gray-400 p-2">No valid application tasks to import.</div>';
+    
+    document.getElementById('importResult').innerHTML='Ready to import. Uncheck any items you wish to skip.';
+    document.getElementById('importExpiry').textContent='Session expires: '+data.expires_at_ist;
+  }catch(e){ document.getElementById('importResult').innerHTML=`<span class="text-red-600">Preview failed: ${escHtml(e.message)}</span>`; }
+}
+
+async function doImportApply(action){
+  const res=document.getElementById('importResult');
+  if(action==='cancel'){
+    if(importSessionId) await API.importApply(importSessionId,'cancel', [], []).catch(()=>{});
+    document.getElementById('importPreviewPanel').classList.add('hidden'); importSessionId=null; return;
+  }
+  if(!importSessionId){ res.innerHTML='No session.'; return; }
+  
+  // Collect checked IDs from the UI (If backend returned arrays for checkbox rendering)
+  const selected_ping_ids = Array.from(document.querySelectorAll('.import-cb[data-type="ping"]:checked')).map(cb => cb.value);
+  const selected_app_ids = Array.from(document.querySelectorAll('.import-cb[data-type="app"]:checked')).map(cb => cb.value);
+
+  res.innerHTML='Applying changes...';
+  try{
+    const data=await API.importApply(importSessionId, action, selected_ping_ids.length ? selected_ping_ids : null, selected_app_ids.length ? selected_app_ids : null);
+    res.innerHTML=`<span class="text-green-700 bg-green-50 p-2 rounded">Import complete: ${data.inserted} inserted, ${data.updated} updated</span>`;
+    importSessionId=null; loadTasks();
+  }catch(e){ res.innerHTML=`<span class="text-red-600 bg-red-50 p-2 rounded">Apply failed: ${escHtml(e.message)}</span>`; }
+}
+
+// ── LOGS ──
+// ── LOGS ──
+function reloadCurrentLogTab() {
+  if (!document.getElementById('logsSection-task').classList.contains('hidden')) loadTaskLogs();
+  if (!document.getElementById('logsSection-admin').classList.contains('hidden')) loadAdminLogs();
+  if (!document.getElementById('logsSection-audit').classList.contains('hidden')) loadAuditLogs();
+}
+
+let taskLogPage=0, adminLogPage=0, auditLogPage=0;
+
+async function loadTaskLogs(){ taskLogPage=0; await _fetchTaskLogs(); }
+async function _fetchTaskLogs(){
+  const limit = document.getElementById('logPageLimit').value;
+  const q={group:'TASK_LOGS', level:document.getElementById('taskLogLevel').value, task_name:document.getElementById('taskLogSearch').value, page:taskLogPage, limit};
+  const data=await API.logs(q).catch(()=>({logs:[],total:0,totalPages:1}));
+  document.getElementById('taskLogsBody').innerHTML=data.logs.length?data.logs.map(l=>`<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="px-5 py-3 text-xs text-gray-500">${toIST(l.created_at)}</td><td class="px-5 py-3 text-xs font-bold">${l.level}</td><td class="px-5 py-3 text-gray-700 text-xs">${escHtml(l.category)}</td><td class="px-5 py-3 font-bold text-xs">${escHtml(l.task_name||'')}</td><td class="px-5 py-3 text-xs">${escHtml(l.message)}</td></tr>`).join('') : '<tr><td colspan="5" class="text-center py-10">No task logs found</td></tr>';
+  
+  const totalPages = data.totalPages || 1;
+  document.getElementById('taskLogPageLabel').textContent=`Page ${taskLogPage+1}/${totalPages} (${data.total})`;
+  
+  // Disable buttons if at boundaries
+  document.getElementById('btnTaskPrev').disabled = (taskLogPage === 0);
+  document.getElementById('btnTaskNext').disabled = (taskLogPage >= totalPages - 1);
+}
+function changeTaskLogPage(d){ 
+  taskLogPage += d; 
+  if (taskLogPage < 0) taskLogPage = 0;
+  _fetchTaskLogs(); 
+}
+
+async function loadAdminLogs(){ adminLogPage=0; await _fetchAdminLogs(); }
+async function _fetchAdminLogs(){
+  const limit = document.getElementById('logPageLimit').value;
+  const q={group:'ADMIN_LOGS', level:document.getElementById('adminLogLevel').value, actor:document.getElementById('adminLogActor').value, page:adminLogPage, limit};
+  const data=await API.logs(q).catch(()=>({logs:[],total:0,totalPages:1}));
+  document.getElementById('adminLogsBody').innerHTML=data.logs.length?data.logs.map(l=>`<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="px-5 py-3 text-xs text-gray-500">${toIST(l.created_at)}</td><td class="px-5 py-3 text-xs font-bold">${l.level}</td><td class="px-5 py-3 font-medium text-xs">${escHtml(l.actor||'')}</td><td class="px-5 py-3 text-xs">${escHtml(l.message)}</td></tr>`).join('') : '<tr><td colspan="4" class="text-center py-10">No users activity logs found</td></tr>';
+  
+  const totalPages = data.totalPages || 1;
+  document.getElementById('adminLogPageLabel').textContent=`Page ${adminLogPage+1}/${totalPages} (${data.total})`;
+  
+  // Disable buttons if at boundaries
+  document.getElementById('btnAdminPrev').disabled = (adminLogPage === 0);
+  document.getElementById('btnAdminNext').disabled = (adminLogPage >= totalPages - 1);
+}
+function changeAdminLogPage(d){ 
+  adminLogPage += d; 
+  if (adminLogPage < 0) adminLogPage = 0;
+  _fetchAdminLogs(); 
+}
+
+async function loadAuditLogs(){ auditLogPage=0; await _fetchAuditLogs(); }
+async function _fetchAuditLogs(){
+  const limit = document.getElementById('logPageLimit').value;
+  const q={actor:document.getElementById('auditLogActor').value, action:document.getElementById('auditLogAction').value, page:auditLogPage, limit};
+  const data=await API.audit(q).catch(()=>({logs:[],total:0,totalPages:1}));
+  document.getElementById('auditLogsBody').innerHTML=data.logs.length?data.logs.map(l=>`<tr class="border-b border-gray-100 hover:bg-gray-50"><td class="px-5 py-3 text-xs text-gray-500">${toIST(l.created_at)}</td><td class="px-5 py-3 font-medium text-xs">${escHtml(l.actor||'')}</td><td class="px-5 py-3 font-medium text-xs">${escHtml(l.action||'')}</td><td class="px-5 py-3 text-xs">${escHtml(l.detail||'')}</td></tr>`).join('') : '<tr><td colspan="4" class="text-center py-10">No auth logs found</td></tr>';
+  
+  const totalPages = data.totalPages || 1;
+  document.getElementById('auditLogPageLabel').textContent=`Page ${auditLogPage+1}/${totalPages} (${data.total})`;
+  
+  // Disable buttons if at boundaries
+  document.getElementById('btnAuditPrev').disabled = (auditLogPage === 0);
+  document.getElementById('btnAuditNext').disabled = (auditLogPage >= totalPages - 1);
+}
+function changeAuditLogPage(d){ 
+  auditLogPage += d; 
+  if (auditLogPage < 0) auditLogPage = 0;
+  _fetchAuditLogs(); 
+}
+
+
+function downloadLogs(fmt){ window.open(API.logsDownloadUrl(document.getElementById('dlRange').value, document.getElementById('dlCategory').value, fmt),'_blank'); }
+
+async function loadArchives(){
+  const data=await API.logArchives().catch(()=>({archives:[]}));
+  document.getElementById('archivesList').innerHTML=data.archives.length?data.archives.map(a=>`<div class="flex items-center gap-4 py-2 border-b text-xs"><span class="w-24">${escHtml(a.archive_date)}</span><span class="w-24 font-bold">${escHtml(a.category)}</span><span class="flex-1">${escHtml(a.filename)}</span><a href="${API.base()}/api/logs/archives/${a.id}/download" target="_blank" class="text-orange-500 font-bold">Download</a></div>`).join(''):'No archives yet.';
+}
+
+async function triggerArchive() {
+  document.getElementById('archivesList').innerHTML = '<span class="text-orange-500 font-bold">Generating end-of-day archives...</span>';
+  try {
+    await API.post('/api/logs/archives/trigger');
+    await loadArchives();
+  } catch(e) { document.getElementById('archivesList').innerHTML = '<span class="text-red-500">Failed to generate archives</span>'; }
+}
+
+// ── SETTINGS ──
+async function loadHealth(){
+  try{
+    const h=await API.health();
+    document.getElementById('healthInfo').innerHTML=`
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div>Monitor Host: <b class="text-gray-900">${h.monitorHost}</b></div><div>Active Tasks: <b class="text-gray-900">${h.activeTasks}</b></div>
+        <div>Uptime: <b class="text-gray-900">${Math.floor(h.uptime/60)}m</b></div><div>DB Size: <b class="text-gray-900">${h.dbSizeKb} KB</b></div>
+      </div>`;
+  }catch{ document.getElementById('healthInfo').innerHTML=`<span class="text-red-600">Failed to load health</span>`; }
+}
+async function sendTestMail(){
+  const to=document.getElementById('testEmailAddr').value.trim(); const res=document.getElementById('testMailResult');
+  if(!to) return res.innerHTML='<span class="text-red-600">Enter email</span>';
+  res.innerHTML='Sending...'; try{ await API.testMail(to); res.innerHTML=`<span class="text-green-700">Success</span>`; }catch(e){ res.innerHTML=`<span class="text-red-600">Failed: ${escHtml(e.message)}</span>`; }
+}
+
+['taskModal','detailModal','userModal'].forEach(id=>{ document.getElementById(id).addEventListener('click',e=>{ if(e.target===document.getElementById(id)) document.getElementById(id).classList.add('hidden'); }); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeTaskModal(); closeDetailModal(); closeUserModal(); } });
+
+loadTasks(); setInterval(loadTasks,30000);
+</script>
+<script src="/js/ai-assistant.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+services:
+  frontend:
+    build: .
+    image: netwatch-frontend:3.0.0
+    container_name: netwatch-frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-http://netwatch-backend:3000}
+    ports:
+      - "${FRONTEND_BIND:-192.168.111.22}:${FRONTEND_PORT:-8888}:80"
+    networks:
+      - netwatch-network
+    security_opt:
+      - no-new-privileges:true
+networks:
+  netwatch-network:
+    external: true

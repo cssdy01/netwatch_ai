@@ -1,0 +1,4 @@
+.env
+secrets/groq_api_key
+node_modules/
+*.log

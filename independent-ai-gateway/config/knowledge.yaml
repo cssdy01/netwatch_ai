@@ -1,0 +1,58 @@
+version: "3.0"
+application:
+  name: Netwatch Monitor
+  assistant: Netwatch AI
+  description: Read-only monitoring assistant for PING and APPLICATION tasks, checks, incidents, notifications, host mappings, and sanitized logs.
+  terminology:
+    task: A configured monitoring job.
+    check: One execution of a task.
+    incident: A failure state opened after the configured consecutive-failure threshold.
+    OK: Current evaluated state is passing.
+    FAULT: Failure threshold has been reached.
+    CFC: Consecutive failure count.
+database:
+  engine: postgresql
+  query_mode: one parameterized SELECT only
+  scopes:
+    PUBLIC_READ_ONLY:
+      approved_views: [ai_public_task_details, ai_public_task_check_history, ai_public_incident_timeline, ai_public_application_logs, ai_public_administrator_contacts, ai_public_host_mappings]
+    AUTHENTICATED_READ_ONLY:
+      approved_views: [ai_public_task_details, ai_public_task_check_history, ai_public_incident_timeline, ai_public_application_logs, ai_public_administrator_contacts, ai_public_host_mappings, ai_authenticated_response_analytics, ai_authenticated_user_activity]
+    SUPERADMIN_READ_ONLY:
+      approved_views: [ai_public_task_details, ai_public_task_check_history, ai_public_incident_timeline, ai_public_application_logs, ai_public_administrator_contacts, ai_public_host_mappings, ai_authenticated_response_analytics, ai_authenticated_user_activity, ai_superadmin_audit_summary, ai_superadmin_user_accounts, ai_superadmin_archives, ai_superadmin_mail_diagnostics, ai_superadmin_system_health, ai_superadmin_task_configuration]
+  views:
+    ai_public_task_details:
+      purpose: Approved complete task state and analytics.
+      columns: [task_id, task_name, task_type, status, is_active, last_checked, target, url, notification_contacts, host_mapping_enabled, host_mapping_hostname, host_mapping_ip, total_checks, failure_count, availability_percent, open_incident, incident_started_at, latest_failure]
+      examples:
+        - "SELECT task_name, status, availability_percent, failure_count, latest_failure, target, url FROM ai_public_task_details WHERE task_type = $1 AND status = $2 ORDER BY task_name LIMIT $3 | [APPLICATION, FAULT, 25]"
+        - "SELECT COUNT(*) AS fault_application_count FROM ai_public_task_details WHERE task_type = $1 AND status = $2 | [APPLICATION, FAULT]"
+    ai_public_task_check_history:
+      columns: [task_id, task_name, task_type, checked_at, result, response_ms, error_sanitized]
+    ai_public_incident_timeline:
+      columns: [task_id, task_name, task_type, status, incident_started_at, l1_sent_at, l2_sent_at, l3_sent_at, last_l3_repeat, alerted_tiers, latest_failure]
+    ai_public_application_logs:
+      columns: [created_at, level, category, task_name, message_sanitized, detail_sanitized]
+    ai_public_administrator_contacts:
+      columns: [email, role]
+    ai_public_host_mappings:
+      columns: [task_id, task_name, hostname, ip_address, enabled]
+    ai_authenticated_response_analytics:
+      columns: [task_id, task_name, task_type, period_start, sample_count, average_ms, minimum_ms, maximum_ms, p95_ms]
+    ai_authenticated_user_activity:
+      columns: [created_at, actor, action, detail_sanitized]
+    ai_superadmin_audit_summary:
+      columns: [action, event_count, first_event_at, last_event_at]
+    ai_superadmin_user_accounts:
+      columns: [email, role, created_at]
+    ai_superadmin_archives:
+      columns: [archive_date, filename, category, size_bytes, created_at]
+    ai_superadmin_mail_diagnostics:
+      columns: [created_at, level, message_sanitized, detail_sanitized]
+    ai_superadmin_system_health:
+      columns: [active_tasks, fault_tasks, open_incidents, checks_last_24h, backend_uptime_seconds]
+    ai_superadmin_task_configuration:
+      columns: [task_id, task_name, task_type, target, url, expected_status, timeout_sec, os_type, interval_min, failure_threshold, l2_delay_min, l3_repeat_min, notification_contacts, email_enabled, is_active, status, cfc, host_mapping_enabled, host_mapping_hostname, host_mapping_ip, created_at, updated_at]
+security:
+  never_expose: [passwords, password hashes, JWTs, cookies, session tokens, API keys, provider keys, service tokens, SMTP credentials, database credentials, authorization headers, secret environment variables, encryption keys, private keys, unrestricted raw logs, PostgreSQL catalogs]
+  disallowed_sql: [INSERT, UPDATE, DELETE, MERGE, ALTER, DROP, CREATE, TRUNCATE, GRANT, REVOKE, COPY, CALL, DO, SELECT INTO, data-changing CTE]

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetWatch — Admin Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { background: #f8fafc; color: #0f172a; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .input-field { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    .input-field:focus { outline: none; border-color: #f97316; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-entry { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-[26rem] animate-entry">
+    <div class="bg-white rounded-2xl border border-gray-200 p-8 sm:p-10 shadow-xl shadow-slate-200/50">
+      <div class="text-center mb-8">
+        <img src="/images/TSAROLABS_updated_logo.png" alt="TSARO Labs" class="h-10 object-contain mx-auto mb-5" onerror="this.style.display='none'">
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">NetWatch Admin</h1>
+        <p class="text-gray-500 text-sm mt-1.5 font-medium">Secure Access Authentication</p>
+      </div>
+      <div id="errMsg" class="hidden mb-6 px-4 py-3 rounded-xl text-sm bg-red-50 text-red-700 border border-red-200 font-medium flex items-center gap-2">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        <span id="errText"></span>
+      </div>
+      <div class="space-y-5">
+        <div>
+          <label for="user" class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Email ID</label>
+          <input id="user" type="email" autocomplete="username" placeholder="admin@company.com" class="input-field w-full px-4 py-3.5 rounded-xl border border-gray-300 text-sm text-gray-900 bg-white placeholder-gray-400" />
+        </div>
+        <div>
+          <label for="pass" class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Password</label>
+          <input id="pass" type="password" autocomplete="current-password" placeholder="••••••••" class="input-field w-full px-4 py-3.5 rounded-xl border border-gray-300 text-sm text-gray-900 bg-white placeholder-gray-400" />
+        </div>
+        <button id="loginBtn" onclick="doLogin()" class="w-full mt-2 py-3.5 rounded-xl font-bold text-sm bg-orange-500 hover:bg-orange-600 text-white transition-all shadow-md shadow-orange-500/20 active:scale-[0.98] flex items-center justify-center gap-2">
+          Sign In
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="text-center mt-6">
+      <a href="/" class="text-sm font-medium text-gray-500 hover:text-orange-500 transition-colors flex items-center justify-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Back to Monitor
+      </a>
+    </div>
+  </div>
+
+  <script src="/config.js"></script>
+  <script src="/js/api.js"></script>
+  <script>
+    API.me().then(() => { window.location = '/admin/dashboard.html'; }).catch(() => {});
+    document.getElementById('user').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('pass').focus(); });
+    document.getElementById('pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    async function doLogin() {
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('errMsg');
+      const errText = document.getElementById('errText');
+      err.classList.add('hidden');
+      btn.innerHTML = `<svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Signing in…`;
+      btn.disabled = true;
+
+      try {
+        await API.login(document.getElementById('user').value, document.getElementById('pass').value);
+        window.location = '/admin/dashboard.html';
+      } catch (e) {
+        errText.textContent = e.message || 'Invalid credentials. Please try again.';
+        err.classList.remove('hidden');
+        btn.innerHTML = `Sign In <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

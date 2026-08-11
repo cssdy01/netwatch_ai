@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetWatch — Monitor Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body { 
+      background: #f8fafc; 
+      color: #0f172a; 
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Subtle Orange Pulse for Alerts */
+    .pulse-orange { animation: pulseOrange 2s infinite; }
+    @keyframes pulseOrange {
+      0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); border-color: rgba(249, 115, 22, 0.6); }
+      70% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); border-color: rgba(249, 115, 22, 0.2); }
+      100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); border-color: #fed7aa; }
+    }
+    
+    /* Card Styles with Smooth Transitions */
+    .card { 
+      background: #ffffff; 
+      border: 1px solid #e2e8f0; 
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease; 
+      cursor: pointer; 
+      animation: fadeIn 0.4s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .card.fault { background: #fffaf5; border-color: #fdba74; }
+    .card.inactive { background: #f8fafc; border-color: #cbd5e1; opacity: 0.7; }
+    
+    /* Modal Background */
+    .modal-bg { background: rgba(17, 24, 39, 0.65); backdrop-filter: blur(4px); }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    
+    /* Tabs */
+    .section-tab-btn { transition: color 0.15s, border-color 0.15s; }
+    .section-tab-active  { color: #f97316; border-bottom: 2px solid #f97316; font-weight: 600; } /* Orange */
+    .section-tab-inactive{ color: #6b7280; border-bottom: 2px solid transparent; font-weight: 500; }
+    .section-tab-inactive:hover { color: #374151; }
+    
+    /* Inputs */
+    .search-input { 
+      background: #ffffff; 
+      border: 1px solid #d1d5db; 
+      color: #111827; 
+      border-radius: 0.5rem; 
+      padding: 0.4rem 0.8rem; 
+      font-size: 0.85rem; 
+      width: 240px; 
+      transition: all 0.2s;
+    }
+    .search-input:focus { 
+      outline: none; 
+      border-color: #f97316; /* Orange focus */
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15); 
+    }
+    
+    pre { white-space: pre-wrap; word-break: break-all; }
+  </style>
+  <link rel="stylesheet" href="/ai-assistant.css">
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+  <div class="flex items-center gap-4">
+    <!-- Company Logo -->
+    <img src="/images/TSAROLABS_updated_logo.png" alt="TSARO Labs" class="h-8 object-contain" onerror="this.style.display='none'">
+    
+    <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div> <!-- Divider -->
+    
+    <div class="w-2.5 h-2.5 rounded-full" id="statusDot" style="background:#22c55e;"></div>
+    <span class="font-bold text-lg text-gray-900 tracking-tight">NetWatch Monitor</span>
+  </div>
+  <div class="flex items-center gap-5">
+    <span id="istClock" class="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-md border border-gray-200"></span>
+    <a href="/admin/login.html" class="text-sm font-medium text-gray-500 hover:text-orange-500 transition">Admin &rarr;</a>
+  </div>
+</header>
+
+<!-- Summary bar -->
+<div class="bg-white px-6 py-4 border-b border-gray-200 flex flex-wrap items-center gap-8 shadow-sm transition-colors">
+  <div class="flex flex-col">
+    <span class="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1">Global Status</span>
+    <div class="flex items-center gap-2">
+      <div id="globalStatusDot" class="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+      <span id="globalStatusText" class="font-bold text-gray-900 text-sm">Monitoring Active</span>
+    </div>
+  </div>
+  
+  <div class="h-8 w-px bg-gray-200 hidden sm:block"></div>
+  
+  <div class="flex gap-8 flex-1">
+    <div class="flex flex-col">
+      <span class="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1">Total Nodes</span>
+      <span id="totalCount" class="font-mono font-bold text-lg text-gray-900">—</span>
+    </div>
+    <div class="flex flex-col">
+      <span class="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1">Operational</span>
+      <span id="okCount" class="font-mono font-bold text-lg text-green-600">—</span>
+    </div>
+    <div class="flex flex-col">
+      <span class="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1 text-orange-500">Alerts</span>
+      <span id="faultCount" class="font-mono font-bold text-lg text-orange-600">—</span>
+    </div>
+    <div class="flex flex-col">
+      <span class="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1">Phased</span>
+      <span id="inactiveCount" class="font-mono font-bold text-lg text-gray-400">—</span>
+    </div>
+  </div>
+
+  <div class="text-right flex flex-col items-end">
+    <span class="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1">Last Sync</span>
+    <span class="text-gray-500 font-mono text-xs flex items-center gap-1.5" id="lastRefresh"></span>
+  </div>
+</div>
+
+<!-- Section tabs -->
+<div class="px-6 flex gap-2 border-b border-gray-200 bg-white">
+  <button class="section-tab-btn section-tab-active px-4 py-3.5 text-sm flex items-center gap-2"
+          onclick="setSection('ping', this)">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+    Systems
+  </button>
+  <button class="section-tab-btn section-tab-inactive px-4 py-3.5 text-sm flex items-center gap-2"
+          onclick="setSection('app', this)">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
+    Applications
+  </button>
+  <button class="section-tab-btn section-tab-inactive px-4 py-3.5 text-sm flex items-center gap-2"
+          onclick="setSection('all', this)">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+    All Tasks
+  </button>
+</div>
+
+<main class="p-6 max-w-[1600px] mx-auto">
+
+  <!-- Ping section -->
+  <div id="section-ping">
+    <div class="flex flex-wrap items-center gap-3 mb-5">
+      <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider w-40 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg> Systems Tasks
+      </h2>
+      <input id="searchPing" type="search" placeholder="Search systems tasks…"
+             class="search-input" oninput="renderAll()">
+      <span id="pingCount" class="text-xs font-medium text-gray-400 ml-2"></span>
+    </div>
+    <div id="gridPing" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+    <div id="emptyPing" class="hidden text-center py-16 text-gray-400 text-sm bg-white rounded-xl border border-gray-200">No Systems tasks found.</div>
+  </div>
+
+  <!-- Application section -->
+  <div id="section-app" class="hidden">
+    <div class="flex flex-wrap items-center gap-3 mb-5">
+      <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider w-40 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg> Applications Tasks
+      </h2>
+      <input id="searchApp" type="search" placeholder="Search application tasks…"
+             class="search-input" oninput="renderAll()">
+      <span id="appCount" class="text-xs font-medium text-gray-400 ml-2"></span>
+    </div>
+    <div id="gridApp" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+    <div id="emptyApp" class="hidden text-center py-16 text-gray-400 text-sm bg-white rounded-xl border border-gray-200">No Application tasks found.</div>
+  </div>
+
+  <!-- All section -->
+  <div id="section-all" class="hidden">
+    <div class="flex flex-wrap items-center gap-3 mb-5">
+      <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider w-40 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg> All Tasks
+      </h2>
+      <input id="searchAll" type="search" placeholder="Search all tasks…"
+             class="search-input" oninput="renderAll()">
+    </div>
+    <div id="gridAll" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+    <div id="emptyAll" class="hidden text-center py-16 text-gray-400 text-sm bg-white rounded-xl border border-gray-200">No tasks found.</div>
+  </div>
+
+  <!-- Loading / empty states -->
+  <div id="loadingMsg" class="text-center py-20 text-gray-500 bg-white rounded-xl border border-gray-200 mt-4 shadow-sm">
+    <svg class="w-10 h-10 mx-auto mb-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <div class="font-medium text-gray-600">Connecting to monitor backend…</div>
+  </div>
+</main>
+
+<!-- Task detail modal (PUBLIC – no auth) -->
+<div id="modal" class="fixed inset-0 z-50 hidden modal-bg flex items-center justify-center p-4">
+  <div class="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl flex flex-col max-h-[90vh]">
+    <div class="flex items-start justify-between p-6 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+      <div>
+        <h2 id="mTitle" class="text-2xl font-bold text-gray-900 tracking-tight"></h2>
+        <div id="mMeta" class="text-sm text-gray-500 mt-2 flex flex-wrap items-center gap-3"></div>
+      </div>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-orange-500 bg-white border border-gray-200 rounded-full w-8 h-8 flex items-center justify-center transition-colors shrink-0 shadow-sm">&times;</button>
+    </div>
+    <div class="overflow-y-auto flex-1 p-6 space-y-6" id="mBody"></div>
+  </div>
+</div>
+
+<script src="/config.js"></script>
+<script src="/js/api.js"></script>
+<script>
+let tasks       = [];
+let currentSection = 'ping';
+
+// ── IST clock ────────────────────────────────────────────────────────────────
+function toIST(utcVal) {
+  if (!utcVal) return '—';
+  return new Date(utcVal).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).replace(/\//g, '-') + ' IST';
+}
+
+setInterval(() => {
+  document.getElementById('istClock').textContent = toIST(new Date().toISOString());
+}, 1000);
+
+// ── Section tabs ──────────────────────────────────────────────────────────────
+function setSection(name, btn) {
+  currentSection = name;
+  ['ping','app','all'].forEach(s => {
+    document.getElementById('section-' + s).classList.toggle('hidden', s !== name);
+  });
+  document.querySelectorAll('.section-tab-btn').forEach(b => {
+    b.className = b.className.replace('section-tab-active','section-tab-inactive');
+  });
+  btn.className = btn.className.replace('section-tab-inactive','section-tab-active');
+  renderAll();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function typeIcon(type) { 
+  return type === 'PING' 
+    ? `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>`
+    : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>`; 
+}
+
+function statusBadge(status) {
+  return status === 'OK'
+    ? `<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-700 border border-green-200"><div class="w-1.5 h-1.5 rounded-full bg-green-500"></div> ONLINE</span>`
+    : `<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-orange-50 text-orange-700 border border-orange-200 pulse-orange"><div class="w-1.5 h-1.5 rounded-full bg-orange-500"></div> ALERT</span>`;
+}
+
+function relTime(iso) {
+  if (!iso) return '—';
+  const d = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (d < 1)  return 'just now';
+  if (d < 60) return `${d}m ago`;
+  return `${Math.floor(d / 60)}h ${d % 60}m ago`;
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderCandles(t) {
+  // If the task is inactive, show dimmed/empty bars
+  if (!t.is_active) {
+    return `<div class="flex items-center gap-[3px] mt-1 opacity-40">
+      ${Array(10).fill(`<div class="w-1.5 h-4 bg-gray-200 rounded-sm"></div>`).join('')}
+    </div>`;
+  }
+
+  let bars = [];
+  let results = Array(10).fill('UNKNOWN');
+
+  // Use the real history array provided by the backend summary
+  if (t.history && Array.isArray(t.history) && t.history.length > 0) {
+    // Pad from the left if we have fewer than 10 checks so far
+    let padLength = 10 - t.history.length;
+    results = Array(padLength).fill('UNKNOWN').concat(t.history);
+  } else {
+    // Fallback if no history exists yet
+    if (t.status === 'OK') results = Array(10).fill('PASS');
+    else if (t.status === 'FAULT') results = Array(10).fill('FAIL');
+  }
+
+  // Draw the 10 candles (oldest on the left, newest on the right)
+  for (let i = 0; i < 10; i++) {
+    let colorClass = 'bg-gray-200'; // Default / PASS
+    if (results[i] === 'FAIL') colorClass = 'bg-orange-500'; // FAULT
+    else if (results[i] === 'UNKNOWN') colorClass = 'bg-gray-100'; // NO DATA YET
+    
+    bars.push(`<div class="w-1.5 h-4 ${colorClass} rounded-sm transition-colors duration-300"></div>`);
+  }
+
+  return `<div class="flex items-center gap-[3px] mt-1" title="Last 10 checks (oldest to newest)">
+    ${bars.join('')}
+  </div>`;
+}
+
+// ── Card render ───────────────────────────────────────────────────────────────
+function renderCard(t) {
+  const isFault    = t.status === 'FAULT' && t.is_active;
+  const isInactive = !t.is_active;
+  
+  // Use CSS classes instead of inline styles for better light mode handling
+  let extraClasses = '';
+  if (isFault) extraClasses += ' fault pulse-orange';
+  if (isInactive) extraClasses += ' inactive';
+
+  return `
+    <div class="card rounded-xl p-5 relative overflow-hidden ${extraClasses}" onclick="openModal('${t.id}')">
+      
+      <div class="flex items-center justify-between mb-4 relative z-10">
+        <span class="bg-gray-50 w-9 h-9 flex items-center justify-center rounded-lg border border-gray-200 shadow-sm transition-colors group-hover:border-gray-300">${typeIcon(t.type)}</span>
+        ${isInactive
+          ? '<span class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-500 border border-gray-200"><div class="w-1.5 h-1.5 rounded-full bg-gray-400"></div> PHASED</span>'
+          : statusBadge(t.status)}
+      </div>
+      
+      <div class="relative z-10">
+        <div class="font-bold text-gray-900 truncate mb-1 text-base tracking-tight" title="${escHtml(t.name)}">${escHtml(t.name)}</div>
+        <div class="text-xs text-gray-500 font-mono truncate bg-gray-50 p-1.5 rounded border border-gray-100 inline-block max-w-full">${escHtml(t.target)}</div>
+      </div>
+
+      <div class="flex items-end justify-between pt-5 mt-5 border-t border-gray-100 relative z-10">
+        <!-- Left Side: Last Check -->
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Last Check</span>
+          <span class="text-xs text-gray-600 font-medium">${t.last_checked ? relTime(t.last_checked) : 'Not checked'}</span>
+          ${isFault && t.incident_duration ? `<span class="text-orange-600 font-bold text-xs mt-0.5">Open ${t.incident_duration}</span>` : ''}
+        </div>
+        
+        <!-- Right Side: Response Time & Candles -->
+        <div class="flex flex-col items-end gap-1">
+          <div class="flex items-baseline gap-1">
+            <span class="text-[10px] text-gray-400 uppercase tracking-wider font-bold mr-1">Response</span>
+            <span class="text-lg font-mono font-bold ${isFault ? 'text-orange-600' : 'text-gray-900'}">${t.last_response_ms != null ? t.last_response_ms : 'ERR'}</span>
+            <span class="text-xs text-gray-500 ${t.last_response_ms != null ? '' : 'hidden'}">ms</span>
+          </div>
+          ${renderCandles(t)}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Render by section ─────────────────────────────────────────────────────────
+function renderAll() {
+  const pingSearch = (document.getElementById('searchPing')?.value || '').toLowerCase();
+  const appSearch  = (document.getElementById('searchApp')?.value  || '').toLowerCase();
+  const allSearch  = (document.getElementById('searchAll')?.value  || '').toLowerCase();
+
+  const sorted = [...tasks].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'FAULT' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  // Ping section
+  const pingTasks = sorted.filter(t => t.type === 'PING' &&
+    (!pingSearch || t.name.toLowerCase().includes(pingSearch) || t.target.toLowerCase().includes(pingSearch)));
+  const gridPing  = document.getElementById('gridPing');
+  const emptyPing = document.getElementById('emptyPing');
+  if (gridPing) {
+    gridPing.innerHTML = pingTasks.map(renderCard).join('');
+    emptyPing.classList.toggle('hidden', pingTasks.length > 0);
+    const pc = document.getElementById('pingCount');
+    if (pc) pc.textContent = `(${pingTasks.length})`;
+  }
+
+  // Application section
+  const appTasks  = sorted.filter(t => t.type === 'APPLICATION' &&
+    (!appSearch || t.name.toLowerCase().includes(appSearch) || t.target.toLowerCase().includes(appSearch)));
+  const gridApp   = document.getElementById('gridApp');
+  const emptyApp  = document.getElementById('emptyApp');
+  if (gridApp) {
+    gridApp.innerHTML  = appTasks.map(renderCard).join('');
+    emptyApp.classList.toggle('hidden', appTasks.length > 0);
+    const ac = document.getElementById('appCount');
+    if (ac) ac.textContent = `(${appTasks.length})`;
+  }
+
+  // All section
+  const allTasks  = sorted.filter(t =>
+    !allSearch || t.name.toLowerCase().includes(allSearch) || t.target.toLowerCase().includes(allSearch));
+  const gridAll   = document.getElementById('gridAll');
+  const emptyAll  = document.getElementById('emptyAll');
+  if (gridAll) {
+    gridAll.innerHTML  = allTasks.map(renderCard).join('');
+    emptyAll.classList.toggle('hidden', allTasks.length > 0);
+  }
+}
+
+// ── Load tasks ─────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    tasks = await API.publicSummary();
+
+    const ok       = tasks.filter(t => t.status === 'OK'    && t.is_active).length;
+    const fault    = tasks.filter(t => t.status === 'FAULT' && t.is_active).length;
+    const inactive = tasks.filter(t => !t.is_active).length;
+
+    document.getElementById('totalCount').textContent   = tasks.length;
+    document.getElementById('okCount').textContent      = ok;
+    document.getElementById('faultCount').textContent   = fault;
+    document.getElementById('inactiveCount').textContent = inactive;
+    
+    // Header Status Dot
+    document.getElementById('statusDot').style.background = fault > 0 ? '#f97316' : '#22c55e';
+    
+    // Global Status in Summary Bar
+    const gDot = document.getElementById('globalStatusDot');
+    const gText = document.getElementById('globalStatusText');
+    if (fault > 0) {
+      gDot.className = 'w-2.5 h-2.5 rounded-full bg-orange-500 pulse-orange';
+      gText.className = 'font-bold text-orange-600 text-sm';
+      gText.textContent = `${fault} System Alert${fault > 1 ? 's' : ''}`;
+    } else {
+      gDot.className = 'w-2.5 h-2.5 rounded-full bg-green-500';
+      gText.className = 'font-bold text-gray-900 text-sm';
+      gText.textContent = 'Monitoring Active';
+    }
+
+    const now = new Date();
+    document.getElementById('lastRefresh').innerHTML  = `
+      <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+      ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}
+    `;
+    
+    document.getElementById('loadingMsg').classList.add('hidden');
+
+    renderAll();
+  } catch (e) {
+    document.getElementById('loadingMsg').innerHTML =
+      `<div class="text-4xl mb-3 text-red-500">⚠</div>
+       <div class="text-red-600 font-medium text-lg">Cannot reach monitor backend.</div>
+       <div class="text-sm text-gray-500 mt-2 bg-gray-50 inline-block px-4 py-2 rounded-lg border border-gray-200">${escHtml(e.message || String(e))}</div>`;
+  }
+}
+
+// ── Task detail modal (public) ────────────────────────────────────────────────
+async function openModal(id) {
+  const modal = document.getElementById('modal');
+  modal.classList.remove('hidden');
+  document.getElementById('mTitle').textContent = 'Loading details…';
+  document.getElementById('mMeta').innerHTML    = '';
+  document.getElementById('mBody').innerHTML    = '<div class="text-gray-400 text-sm flex items-center gap-2"><svg class="w-5 h-5 animate-spin text-orange-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Loading…</div>';
+
+  try {
+    const t = await API.publicTaskDetail(id);
+
+    document.getElementById('mTitle').textContent = t.name;
+
+    const statusHtml = t.status === 'FAULT'
+      ? `<span class="flex items-center gap-1.5 text-red-700 font-bold bg-red-50 px-2.5 py-0.5 rounded border border-red-200 shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> ALERT</span>`
+      : `<span class="flex items-center gap-1.5 text-green-700 font-bold bg-green-50 px-2.5 py-0.5 rounded border border-green-200 shadow-sm"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg> ONLINE</span>`;
+
+    document.getElementById('mMeta').innerHTML =
+      `<span class="bg-white border border-gray-200 px-2 py-0.5 rounded shadow-sm flex items-center gap-1">${typeIcon(t.type)} <span class="text-gray-700 font-medium">${t.type}</span></span>
+       <span class="font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded border border-gray-200 flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg> ${escHtml(t.target)}</span>
+       ${statusHtml}
+       ${t.incident_duration ? `<span class="text-red-600 font-medium text-sm">Open ${t.incident_duration}</span>` : ''}`;
+
+    // Incident box
+    const incBox = t.incident
+      ? `<div class="px-5 py-4 rounded-xl border border-red-200 bg-red-50 shadow-sm text-sm">
+           <div class="text-red-700 font-bold mb-3 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Active Incident</div>
+           <div class="text-sm text-red-900/80 space-y-1.5 grid grid-cols-1 sm:grid-cols-2">
+             <div><span class="font-medium">Started:</span> ${toIST(t.incident.t0)}</div>
+             <div><span class="font-medium">L1 Alert:</span> ${t.incident.l1_sent_at ? 'Sent ' + toIST(t.incident.l1_sent_at) : '—'}</div>
+             <div><span class="font-medium">L2 Alert:</span> ${t.incident.l2_sent_at ? 'Sent ' + toIST(t.incident.l2_sent_at) : 'Pending (48h)'}</div>
+             <div><span class="font-medium">L3 Alert:</span> ${t.incident.l3_sent_at ? 'Sent ' + toIST(t.incident.l3_sent_at) : 'Pending (48h after L2)'}</div>
+           </div>
+         </div>`
+      : `<div class="px-5 py-3 rounded-xl border border-green-200 bg-green-50 text-sm text-green-800 shadow-sm font-medium flex items-center gap-2">
+           <div class="bg-green-200 text-green-700 rounded-full w-5 h-5 flex items-center justify-center text-xs"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg></div> No active incident
+         </div>`;
+
+    // Endpoint results (APPLICATION)
+    let endpointsHtml = '';
+    if (t.type === 'APPLICATION' && t.last_endpoint_results?.length) {
+      endpointsHtml = `
+        <div>
+          <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">🔗 Endpoint Results</div>
+          <div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+            ${t.last_endpoint_results.map(ep => `
+              <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0 text-sm 
+                           ${ep.result === 'FAIL' ? 'bg-red-50' : 'hover:bg-gray-50 transition-colors'}">
+                <span class="font-bold w-12 text-center rounded px-1 py-0.5 text-xs ${ep.result === 'PASS' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}">${ep.result}</span>
+                <span class="font-mono text-gray-700 flex-1 truncate">${escHtml(ep.url)}</span>
+                ${ep.httpStatus ? `<span class="text-gray-500 font-medium text-xs bg-gray-100 px-2 py-1 rounded">HTTP ${ep.httpStatus}</span>` : ''}
+                ${ep.responseMs ? `<span class="text-gray-500 text-xs">${ep.responseMs}ms</span>` : ''}
+              </div>`).join('')}
+          </div>
+        </div>`;
+    }
+
+    // Single URL list (APPLICATION)
+    let urlsHtml = '';
+    if (t.type === 'APPLICATION' && t.url && !t.last_endpoint_results?.length) {
+      urlsHtml = `
+        <div>
+          <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">🔗 Monitored URL</div>
+          <div class="space-y-1.5 p-3 rounded-xl border border-gray-200 bg-gray-50">
+            <div class="font-mono text-sm text-gray-700 bg-white px-3 py-1.5 rounded border border-gray-100 shadow-sm">${escHtml(t.url)}</div>
+          </div>
+        </div>`;
+    }
+
+    // Last check time in IST
+    const lastCheckHtml = t.last_checked
+      ? `<div class="text-sm text-gray-500 font-medium">Last checked: <span class="text-gray-800">${toIST(t.last_checked)}</span></div>`
+      : '';
+
+    // Raw error
+    const errorHtml = t.last_error_raw
+      ? `<div>
+           <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">💥 Last Error</div>
+           <pre class="text-xs text-red-800 rounded-xl p-4 border border-red-200 shadow-sm"
+                style="background:#fef2f2; border-left:4px solid #ef4444">${escHtml(t.last_error_raw)}</pre>
+         </div>`
+      : `<div class="text-sm text-green-700 px-4 py-3 rounded-xl border border-green-200 bg-green-50 shadow-sm font-medium">
+           ✔ Last check passed — no errors
+         </div>`;
+
+    // Recent checks
+    const checksHtml = t.checks?.length
+      ? `<div>
+           <div class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Recent Checks (Last 10)</div>
+           <div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+             ${t.checks.slice(0, 10).map(c => `
+               <div class="flex items-center gap-4 px-4 py-2.5 border-b border-gray-100 last:border-0 text-sm hover:bg-gray-50 transition-colors">
+                 <span class="font-bold w-12 text-center rounded px-1 py-0.5 text-xs ${c.result === 'PASS' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${c.result}</span>
+                 <span class="text-gray-600 font-medium">${toIST(c.checked_at)}</span>
+                 ${c.response_ms != null ? `<span class="text-gray-500 text-xs ml-auto bg-gray-100 px-2 py-1 rounded-md border border-gray-200">${c.response_ms}ms</span>` : ''}
+               </div>`).join('')}
+           </div>
+         </div>` : '';
+
+    document.getElementById('mBody').innerHTML =
+      [lastCheckHtml, incBox, endpointsHtml || urlsHtml, errorHtml, checksHtml].filter(Boolean).join('');
+
+  } catch (e) {
+    document.getElementById('mBody').innerHTML =
+      `<div class="text-red-600 bg-red-50 p-4 rounded-xl border border-red-200 text-sm">Failed to load task detail: <span class="font-mono">${escHtml(e.message)}</span></div>`;
+  }
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// Initial load + auto-refresh every 15s (only refreshes task blocks)
+load();
+setInterval(load, 15000);
+</script>
+<script src="/js/ai-assistant.js"></script>
+</body>
+</html>
